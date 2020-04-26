@@ -41,8 +41,18 @@ def conv(x,
     return x
 
 
+def res(x, nf_in, itea_sub, nf_sub, nf_left, nf_right, nf_out):
+    x = conv(x, nf_in, (3, 3), strides=(2, 2))
+    x_sub = res_sub(x, itea_sub, nf_sub)
+    x_left = conv(x_sub, nf_left, (1, 1))
+    x_right = conv(x, nf_right, (1, 1))
+    x = Concatenate()([x_left, x_right])
+    x = conv(x, nf_out, (1, 1))
+    return x
+
+
 def res_sub(x, itea, num_filters):
-    x = conv(x, num_filters * 2, (1, 1))
+    x = conv(x, num_filters, (1, 1))
     for i in range(itea):
         x1 = conv(x, num_filters, (1, 1))
         x1 = conv(x1, num_filters, (3, 3))
@@ -50,28 +60,10 @@ def res_sub(x, itea, num_filters):
     return x
 
 
-def res(x, itea, num_filters):
-    x = conv(x, num_filters * 2, (3, 3), strides=(2, 2))
-    x1 = res_sub(x, itea, num_filters * 2)
-    x1 = conv(x1, 64, (1, 1))
-    x2 = conv(x, 64, (1, 1))
-    x = Concatenate()([x1, x2])
-    x = conv(x, num_filters * 2, (1, 1))
-    return x
-
-
 def yolo4(input):
     x = conv(input, 32, (3, 3))
-    x = res(x, 1, 64)
-
-    x = conv(x, 64, (1, 1))
-    x = res(x, )
-    x = conv(x, 128, (1, 1))
-    x = conv(x, 256, (3, 3), strides=(2, 2))
-
-    x1 = res_sub(x, 8)
-    x1 = conv(x1, 128, (1, 1))
-    x2 = conv(x, 128, (1, 1))
-    x = Concatenate()([x1, x2])
+    x = res(x, 64, 1, 64, 64, 64, 64)
+    x = res(x, 128, 2, 64, 64, 64, 128)
+    x = res(x, 128, 8, 128, 128, 128, 256)
 
     return x

@@ -1,0 +1,26 @@
+<annotation>
+	<folder>JPEGImages</folder>
+	<filename>000003.jpg</filename>
+	<path>/Users/xuan/git/yolo4_tensorflow2/sources/dataSet/JPEGImages/000003.jpg</path>
+	<source>
+		<database>Unknown</database>
+	</source>
+	<size>
+		<width>640</width>
+		<height>549</height>
+		<depth>3</depth>
+	</size>
+	<segmented>0</segmented>
+	<object>
+		<name>cat</name>
+		<pose>Unspecified</pose>
+		<truncated>0</truncated>
+		<difficult>0</difficult>
+		<bndbox>
+			<xmin>154</xmin>
+			<ymin>50</ymin>
+			<xmax>634</xmax>
+			<ymax>477</ymax>
+		</bndbox>
+	</object>
+</annotation>

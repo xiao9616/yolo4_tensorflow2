@@ -1,0 +1,2 @@
+/Users/xuan/git/yolo4_tensorflow2/sources/dataSet/JPEGImages/000002.jpg 41,38,490,319,0
+/Users/xuan/git/yolo4_tensorflow2/sources/dataSet/JPEGImages/000003.jpg 154,50,634,477,0
