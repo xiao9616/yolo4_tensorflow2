@@ -100,7 +100,8 @@ def merge(x1, x2, num_filter1, num_filter2):
     return x
 
 
-def yolo4(input):
+def yolo4(input, anchor_nums, classes_num):
+    out_shape = anchor_nums * (5 + classes_num)
     x = conv(input, 32, (3, 3))
     x = res(x, 64, 1, 64, 64, 64, 64)
     x = res(x, 128, 2, 64, 64, 64, 128)
@@ -110,9 +111,9 @@ def yolo4(input):
     x3 = spp(x3)
     x2 = upper_concate(x2, x3, 256, 512)
     x1 = upper_concate(x1, x2, 128, 256)
-    yolo1 = yolo(x1, 256, 255)
+    yolo1 = yolo(x1, 256, out_shape)
     x2 = merge(x1, x2, 256, 512)
-    yolo2 = yolo(x2, 512, 255)
+    yolo2 = yolo(x2, 512, out_shape)
     x3 = merge(x2, x3, 512, 1024)
-    yolo3 = yolo(x3, 1024, 255)
+    yolo3 = yolo(x3, 1024, out_shape)
     return yolo1, yolo2, yolo3

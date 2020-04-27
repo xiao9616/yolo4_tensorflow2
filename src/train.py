@@ -10,8 +10,15 @@
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Input
 from src.yolo4.yolo4_Model import yolo4
+from configparser import ConfigParser
 
-model_input = Input(shape=(608, 608, 3))
-model_output = yolo4(model_input)
+config = ConfigParser()
+config.read("./config.ini")
+input_shape = int(config.get("model", "input_shape"))
+anchors_num = int(config.get("model", "anchors_num"))
+classes_num = int(config.get("data", "classes_num"))
+
+model_input = Input(shape=(input_shape, input_shape, 3))
+model_output = yolo4(model_input, anchors_num, classes_num)
 model = Model(model_input, model_output)
 model.summary()
