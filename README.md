@@ -103,7 +103,13 @@ yolo4的主要改进点：
 
 ### 5.Mish
 
+平滑的激活函数允许更好的信息深入神经网络，从而得到更好的准确性和泛化。
 
+Mish=x * tanh(ln(1+e^x))。
+
+![在这里插入图片描述](README.assets/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzM1NjA4Mjc3,size_16,color_FFFFFF,t_70-20200428231614763.png)
+
+yolo4只在backbone中使用的该激活函数,其他为LeakRelu
 
 ### 6.Mosaic data augmnetation
 
@@ -111,7 +117,22 @@ yolo4的主要改进点：
 
 ### 7.DropBlock regularization
 
+DropBlock regularization是一种针对卷积层的正则化方法。
 
+​		原来的dropout方法多是作用在全连接层上，在卷积层应用dropout方法意义不大。文章认为是因为每个featuremap的位置都有一个感受野范围，仅仅对单个像素位置进行dropout并不能降低featuremap学习的特征范围，也就是说网络仍可以通过该位置的相邻位置元素去学习对应的语义信息，也就不会促使网络去学习更加鲁邦的特征。既然单独的对每个位置进行dropout并不能提高网络的泛化能力，那么很自然的，如果我们按照一块一块的去dropout，就自然可以促使网络去学习更加鲁邦的特征。思路很简单，就是在featuremap上去一块一块的找，进行归零操作，类似于dropout，叫做dropblock。
+
+
+![img](README.assets/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzE0ODQ1MTE5,size_16,color_FFFFFF,t_70.png)
+
+(a)原始输入图像
+
+(b)绿色部分表示激活的特征单元，b图表示了随机dropout激活单元，但是这样dropout后，网络还会从drouout掉的激活单元附近学习到同样的信息
+
+(c)绿色部分表示激活的特征单元，c图表示本文的DropBlock，通过dropout掉一部分相邻的整片的区域（比如头和脚），网络就会去注重学习狗的别的部位的特征，来实现正确分类，从而表现出更好的泛化。
+
+dropblock有三个比较重要的参数，一个是block_size，用来控制进行归零的block大小；一个是γ，用来控制每个卷积结果中，到底有多少个channel要进行dropblock；最后一个是keep_prob，作用和dropout里的参数一样。
+
+​		经过实验证明，block_size控制为7*7效果最好，对于所有的featuremap都一样，γ 通过一个公式来控制，keep_prob则是一个线性衰减过程，从最初的1到设定的阈值。
 
 ### 8.CIOU loss
 
@@ -119,7 +140,9 @@ yolo4的主要改进点：
 
 ## 网络结构
 
-我们在CSPDarknet53上添加SPP block，因为它能够显著增加感受野，分离出最重要的上下文特征且几乎没有降低网络的运行速度。我们使用PANet作为参数聚集的方法，而不是YOLOv3中使用的FPN。最后，我们使用CSPDarknet53的主干网络, SPP附加模块, PANet 以及YOLOv3的头部作为YOLOv4的框架。
+​		我们在CSPDarknet53上添加SPP block，因为它能够显著增加感受野，分离出最重要的上下文特征且几乎没有降低网络的运行速度。我们使用PANet作为参数聚集的方法，而不是YOLOv3中使用的FPN。最后，我们使用CSPDarknet53的主干网络, SPP附加模块, PANet 以及YOLOv3的头部作为YOLOv4的框架。
+
+![在这里插入图片描述](README.assets/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzM1NjA4Mjc3,size_16,color_FFFFFF,t_70.png)
 
 ### YOLOv4 consists of:
 
@@ -127,12 +150,58 @@ yolo4的主要改进点：
 - Neck: SPP, PAN
 - Head: YOLOv3
 
+#### PAN
+
+![在这里插入图片描述](README.assets/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L2ppY29uZzQ0,size_16,color_FFFFFF,t_70.png)
+
+​        总体上是Mask-Rcnn的改进版本，整体思路是提高信息流在网络中的传递效率。第一个改进：为了提高低层信息的利用率，加快低层信息的传播效率，提出了Bottom-up Path Augmentation；第二个改进：通常FPN在多层进行选anchors时，根据anchors的大小，将其分配到对应的层上进行分层选取。这样做很高效，但同时也不能充分利用信息了，提出了Adaptive Feature Pooling。第三个改进：为了提高mask的生成质量，作者将卷积-上采样和全连接层进行融合，提出了Fully-connected Fusion。
+
+**1.Bottom-up Path Augmentation**
+
+​        一般都知道，网络的低层特征中含有更多的位置信息，高层特征中含有更多的语义信息。FPN是网络在下采样结束后，再返回来进行上采样，并通过横向连接获取同级下采的信息。FPN做的就是将高层的语义信息回向传递，利用高层语义信息来提高低层的效果。Bottom-up Path Augmentation在此基础上又增加了一个低层到高层的通道，将低层信息直接向上进行传递，提高底层信息的利用率。
+        上图中的b区域就是新增的Bottom-up Path Augmentation。红线是FPN中底层信息的传递路径，要经过100+layers。绿线是PANet的底层信息传递路径，经过的路径少于10层。
+
+区别:PANet中使用的是add方法,yolo4中使用的concat方法(concat 能够提供更丰富的信息)
+
+![在这里插入图片描述](README.assets/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzM1NjA4Mjc3,size_16,color_FFFFFF,t_70-20200428232109082.png)
+
+**2.Adaptive Feature Pooling**
+
+​       低层特征中含有更多的位置信息，高层特征中含有更多的语义信息，根据proposal的大小将其划分到对应的层上，大的分配到高层上，小的分配到低层上。这会造成大的proposal只能更多的利用语义信息，小的proposal只能更多的利用位置信息，这当然会对精度造成影响，这是FPN的不足之处。
+
+![在这里插入图片描述](README.assets/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L2ppY29uZzQ0,size_16,color_FFFFFF,t_70-20200428214327146.png)
+
+​       首先对于每个proposal来说，将其映射在不同的feature level上；然后用ROI Align,再利用融合操作（逐元素进行max或者sum）将不同层上的进行融合。
+
+**3.Fully-connected Fusion**
+
+![在这里插入图片描述](README.assets/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L2ppY29uZzQ0,size_16,color_FFFFFF,t_70-20200428214757418.png)
+
+​		加入下层fc的原因：由于fc是通过大量的参数来预测特征图不同位置的，所以fc是位置敏感的。而且fc可以利用全局信息对各个子区域进行预测，有助于区分不同实例和识别属于同一对象的不同部分。
+
+​		模块结构：上面是四个卷积加一个反卷积，卷积都是256个3*3的filter，上采样的倍数为2。mask预测的是前景/背景的二分类。增加的为下部分，从conv3引下来一个分支，该分支包含两个conv，一个fc和一个reshape。其中conv5_fc是将通道减半（由图看出来变薄了）的，fc要保证reshape后的特征图大小和上面的反卷积之后的特征图大小一致。
+
+#### SPP
+
+![img](README.assets/2.png)
+
+​		spp提出的初衷是为了解决CNN对输入图片尺寸的限制。由于全连接层的存在，与之相连的最后一个卷积层的输出特征需要固定尺寸，从而要求输入图片尺寸也要固定。spp-net之前的做法是将图片裁剪或变形（crop/warp）. 简而言之，即是将任意尺寸的feature map用三个尺度的金字塔层分别池化，将池化后的结果拼接得到固定长度的特征向量（图中的256为filter的个数），送入全连接层进行后续操作。后来的Fast RCNN网络即借鉴了spp的思想。其中的ROI Pooling可理解为单尺度的SPP层。
+
+![image-20200428224306068](README.assets/image-20200428224306068.png)
+
+​		在yolo4中使用的是如上图的结构,池化的size分别为[1,5,,9,13],池化要保持特征图大小一致和通道数一致,再将池化后的特征进行concatenate.
+
 ### YOLO v4 uses:
 
 - Bag of Freebies (BoF) for backbone: CutMix and Mosaic data augmentation, DropBlock regularization,Class label smoothing
+
 - Bag of Specials (BoS) for backbone: Mish activation, Cross-stage partial connections (CSP), Multi-input weighted residual connections (MiWRC)
+
 - Bag of Freebies (BoF) for detector: CIoU-loss,CmBN, DropBlock regularization, Mosaic data augmentation, Self-Adversarial Training, Eliminate grid sensitivity, Using multiple anchors for a single ground truth, Cosine annealing scheduler, Optimal hyper parameters, Random training shapes
+
 - Bag of Specials (BoS) for detector: Mish activation,SPP-block, SAM-block, PAN path-aggregation block, DIoU-NMS
+
+    
 
 ## 代码实现
 
