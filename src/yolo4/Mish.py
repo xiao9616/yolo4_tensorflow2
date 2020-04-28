@@ -9,6 +9,8 @@
 import tensorflow as tf
 from tensorflow.keras.layers import Activation
 from tensorflow.keras.utils import get_custom_objects
+from tensorflow.math import tanh, softplus
+
 
 class Mish(Activation):
     '''
@@ -30,6 +32,7 @@ class Mish(Activation):
 
 
 def mish(inputs):
-    return inputs * tf.math.tanh(tf.math.softplus(inputs))
+    return inputs * tanh(softplus(inputs))
+
 
 get_custom_objects().update({'Mish': Mish(mish)})

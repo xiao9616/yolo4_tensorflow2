@@ -70,7 +70,6 @@ def upper_concate(x1, x2, num_filter1, num_filter2):
     x = conv(x, num_filter1, (1, 1), activation='LeakRelu')
     return x
 
-
 def spp(x):
     x = conv(x, 512, (1, 1), activation='LeakRelu')
     x = conv(x, 1024, (3, 3), activation='LeakRelu')

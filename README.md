@@ -7,7 +7,7 @@ yolo 4th edition  implemented by tensorflow2.0
 
 ## 综述
 
-![img](README.assets/640.webp)
+![1588044968587](README.assets/1588044968587.png)
 
 对于那些在GPU平台上运行的检测器，它们的主干网络可能为VGG、ResNet、ResNeXt或DenseNet。
 
