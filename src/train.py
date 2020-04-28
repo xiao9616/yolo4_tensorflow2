@@ -9,7 +9,7 @@
 
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Input
-from src.yolo4.yolo4_Model import yolo4
+from yolo4.yolo4_Model import yolo4
 from configparser import ConfigParser
 
 config = ConfigParser()
