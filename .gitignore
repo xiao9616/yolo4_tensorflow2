@@ -1,0 +1,38 @@
+﻿# vscode config
+.vscode/
+.idea/
+__pycache__/
+
+
+# JPG PNG图片
+# *.jpg
+# *.png
+
+# 训练集
+VOCdevkit/
+
+# 训练模型
+logs/
+*.h5
+*.weight
+
+# 训练集索引
+2007_train.txt
+2007_val.txt
+2007_test.txt
+
+# 测试文件夹
+test/
+test.py
+test*.py
+test.jpg
+test_rst.jpg
+
+# mAP测试结果
+mAP/input/detection-results/
+mAP/input/ground-truth
+mAP/input/ground-truth-xml
+mAP/results/
+
+# 未完成、中间变量
+.temp_files/
