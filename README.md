@@ -79,9 +79,47 @@ CmBN为CBN的修改版，定义为Cross mini-Batch Normalization（CmBN），它
 
 我们将SAM从spatial-wise attention改为point-wise attention。同时，替换PAN到concatenation的连接。
 
+### 导图
+
+![YOLOv4的思维导图](README.assets/20200424193904517.png)
+
 ## 论文研读
 
 yolo4的主要改进点：
+
+**骨干网络训练阶段优化**
+
+- [x] 数据增强Mosaic data augmentation
+- [x] 正则化DropBlock regularization
+- [x] 类标签平滑Class label smoothing
+- [x] Cutmix
+
+**骨干网络检测阶段优化**
+
+- [x] Mish 激活 Mish-activation
+- [x] Cross-stage partial connections (CSP)
+- [ ] Multi-input weighted residual connections (MiWRC)加权残差连接
+
+**detector训练阶段优化**
+
+- [ ] 损失CIoU loss
+- [ ] Cross mini-Batch Normalization (CmBN)
+- [x] 正则化DropBlock regularization
+- [x] 数据增强Mosaic data augmentation
+- [ ] 自对抗训练Self-adversarial-training (SAT)
+- [ ] Eliminate grid sensitivity
+- [ ] Using multiple anchors for a single ground truth
+- [ ] Cosine annealing scheduler
+- [ ] 使用遗传算法选择最优超参数Optimal hyper-parameters
+- [ ] Random training shapes
+
+**detector检测阶段优化**
+
+- [x] Mish 激活 Mish-activation
+- [x] SPP-block
+- [ ] SAM-block
+- [x] PAN path-aggregation block
+- [ ] DIoU-NMS
 
 ### 1.WRC
 
@@ -89,17 +127,25 @@ yolo4的主要改进点：
 
 ### 2.CSP
 
+Cross Stage Partial Network(CSPNet)就是从网络结构设计的角度来解决以往工作在推理过程中需要很大计算量的问题。
 
+CSPNet做backbone可以极大提升模型的准确率，在同等FPS的情况下，CSPNet准确率更有竞争力。
 
+CSPNet提出主要是为了解决三个问题：
 
+- 增强CNN的学习能力，能够在轻量化的同时保持准确性。
+- 降低计算瓶颈
+- 降低内存成本
 
 ### 3.CmBN
 
 
 
-### 4.SAT
+### 4.SAT 
 
+- [ ] todo
 
+我的理解是利用GAN网络，反向训练对图片进行扰动，然后在这个图片上进行训练
 
 ### 5.Mish
 
@@ -113,7 +159,16 @@ yolo4只在backbone中使用的该激活函数,其他为LeakRelu
 
 ### 6.Mosaic data augmnetation
 
+数据增强的几种方式：
 
+- Mixup:将随机的两张样本按比例混合，分类的结果按比例分配；
+- Cutout:随机的将样本中的部分区域cut掉，并且填充0像素值，分类的结果不变；
+- CutMix:就是将一部分区域cut掉但不填充0像素而是随机填充训练集中的其他数据的区域像素值，分类结果按一定的比例分配
+- Mosaic：就是图像拼接，将多张图片拼接成一张（论文中Mosaic 混合了 4 张图像，而 CutMix 混合了两张）
+- 翻转，旋转，裁剪，变形，缩放
+- 噪声、模糊、颜色变换、擦除、填充
+
+![在这里插入图片描述](README.assets/20200424163458299.png)
 
 ### 7.DropBlock regularization
 
@@ -134,7 +189,21 @@ dropblock有三个比较重要的参数，一个是block_size，用来控制进�
 
 ​		经过实验证明，block_size控制为7*7效果最好，对于所有的featuremap都一样，γ 通过一个公式来控制，keep_prob则是一个线性衰减过程，从最初的1到设定的阈值。
 
-### 8.CIOU loss
+### 8.Class label smoothing
+
+​		如果分类准确，交叉熵损失函数的结果是0，否则交叉熵为无穷大。也就是说交叉熵对分类正确给的是最大激励。换句话说，对于标注数据来说，这个时候我们认为其标注结果是准确的（不然这个结果就没意义了）。但实际上，有一些标注数据并不一定是准确的。那么这时候，使用交叉熵损失函数作为目标函数并不一定是最优的。
+
+​		如果训练数据能覆盖所有情况，或者是完全正确，那么这种方式没有问题。但事实上，这不可能。所以这种方式可能会带来泛化能力差的问题，即过拟合。
+
+​		label smoothing的原理就是为损失函数增强其他标签的损失函数值。类似于其为非标签的标签增加了一定概率的可选择性。
+
+```
+Label=((1-epsilon) * inputs) + (epsilon / K)
+```
+
+对于一个2分类的问题，如有一个样本属于第一类时，原来应该这么定义标签·[1 , 0] , 使用label smoothing后（epsilon=0.1）就变成了[ 1 ，0 ]*(1-0.1)+0.1/2 = [0.95 . 0.05] 。就是说增加了第二类的类别概率，而不是一棍子打死。
+
+### 9.CIOU loss
 
 
 
