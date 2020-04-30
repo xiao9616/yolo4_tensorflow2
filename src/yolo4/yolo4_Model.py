@@ -76,7 +76,7 @@ def spp(x):
     x = conv(x, 512, (1, 1), activation='LeakRelu')
     x = spp_sub(x)
     x = conv(x, 512, (1, 1), activation='LeakRelu')
-    x = conv(x, 1024, (1, 1), activation='LeakRelu')
+    x = conv(x, 1024, (3, 3), activation='LeakRelu')
     x = conv(x, 512, (1, 1), activation='LeakRelu')
     return x
 
@@ -104,8 +104,8 @@ def yolo4(input, anchor_nums, classes_num):
     x = conv(input, 32, (3, 3))
     x = res(x, 64, 1, 64, 64, 64, 64)
     x = res(x, 128, 2, 64, 64, 64, 128)
-    x1 = res(x, 128, 8, 128, 128, 128, 256)
-    x2 = res(x1, 256, 8, 256, 256, 256, 512)
+    x1 = res(x, 256, 8, 128, 128, 128, 256)
+    x2 = res(x1, 512, 8, 256, 256, 256, 512)
     x3 = res(x2, 1024, 4, 512, 512, 512, 1024)
     x3 = spp(x3)
     x2 = upper_concate(x2, x3, 256, 512)
