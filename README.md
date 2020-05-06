@@ -274,3 +274,27 @@ Label=((1-epsilon) * inputs) + (epsilon / K)
 
 ## 代码实现
 
+代码完成度：
+
+- [ ] 数据增强Mosaic data augmentation
+- [ ] 正则化DropBlock regularization
+- [x] 类标签平滑Class label smoothing
+- [ ] Cutmix
+
+- [ ] Mish 激活 Mish-activation
+- [ ] Cross-stage partial connections (CSP)
+- [ ] Multi-input weighted residual connections (MiWRC)加权残差连接
+
+- [ ] 损失CIoU loss
+- [ ] Cross mini-Batch Normalization (CmBN)
+- [ ] 自对抗训练Self-adversarial-training (SAT)
+- [ ] Eliminate grid sensitivity
+- [ ] Using multiple anchors for a single ground truth
+- [ ] Cosine annealing scheduler
+- [ ] 使用遗传算法选择最优超参数Optimal hyper-parameters
+- [ ] Random training shapes
+
+- [x] SPP-block
+- [ ] SAM-block
+- [x] PAN path-aggregation block
+- [ ] DIoU-NMS

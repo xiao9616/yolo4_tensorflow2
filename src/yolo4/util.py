@@ -62,6 +62,119 @@ def box_iou(b1, b2):
     return iou
 
 
+def box_giou(b1, b2):
+    """
+    Calculate GIoU loss on anchor boxes
+    Reference Paper:
+        "Generalized Intersection over Union: A Metric and A Loss for Bounding Box Regression"
+        https://arxiv.org/abs/1902.09630
+
+    Parameters
+    ----------
+    b1: tensor, shape=(batch, feat_w, feat_h, anchor_num, 4), xywh
+    b2: tensor, shape=(batch, feat_w, feat_h, anchor_num, 4), xywh
+
+    Returns
+    -------
+    giou: tensor, shape=(batch, feat_w, feat_h, anchor_num, 1)
+    """
+    b1_xy = b1[..., :2]
+    b1_wh = b1[..., 2:4]
+    b1_wh_half = b1_wh / 2.
+    b1_mins = b1_xy - b1_wh_half
+    b1_maxes = b1_xy + b1_wh_half
+
+    b2_xy = b2[..., :2]
+    b2_wh = b2[..., 2:4]
+    b2_wh_half = b2_wh / 2.
+    b2_mins = b2_xy - b2_wh_half
+    b2_maxes = b2_xy + b2_wh_half
+
+    intersect_mins = K.maximum(b1_mins, b2_mins)
+    intersect_maxes = K.minimum(b1_maxes, b2_maxes)
+    intersect_wh = K.maximum(intersect_maxes - intersect_mins, 0.)
+    intersect_area = intersect_wh[..., 0] * intersect_wh[..., 1]
+    b1_area = b1_wh[..., 0] * b1_wh[..., 1]
+    b2_area = b2_wh[..., 0] * b2_wh[..., 1]
+    union_area = b1_area + b2_area - intersect_area
+    # calculate IoU, add epsilon in denominator to avoid dividing by 0
+    iou = intersect_area / (union_area + K.epsilon())
+
+    # get enclosed area
+    enclose_mins = K.minimum(b1_mins, b2_mins)
+    enclose_maxes = K.maximum(b1_maxes, b2_maxes)
+    enclose_wh = K.maximum(enclose_maxes - enclose_mins, 0.0)
+    enclose_area = enclose_wh[..., 0] * enclose_wh[..., 1]
+    # calculate GIoU, add epsilon in denominator to avoid dividing by 0
+    giou = iou - 1.0 * (enclose_area - union_area) / (enclose_area + K.epsilon())
+    giou = K.expand_dims(giou, -1)
+
+    return giou
+
+
+def box_diou(b1, b2):
+    """
+    Calculate DIoU loss on anchor boxes
+    Reference Paper:
+        "Distance-IoU Loss: Faster and Better Learning for Bounding Box Regression"
+        https://arxiv.org/abs/1911.08287
+
+    Parameters
+    ----------
+    b1: tensor, shape=(batch, feat_w, feat_h, anchor_num, 4), xywh
+    b2: tensor, shape=(batch, feat_w, feat_h, anchor_num, 4), xywh
+
+    Returns
+    -------
+    diou: tensor, shape=(batch, feat_w, feat_h, anchor_num, 1)
+    """
+    b1_xy = b1[..., :2]
+    b1_wh = b1[..., 2:4]
+    b1_wh_half = b1_wh / 2.
+    b1_mins = b1_xy - b1_wh_half
+    b1_maxes = b1_xy + b1_wh_half
+
+    b2_xy = b2[..., :2]
+    b2_wh = b2[..., 2:4]
+    b2_wh_half = b2_wh / 2.
+    b2_mins = b2_xy - b2_wh_half
+    b2_maxes = b2_xy + b2_wh_half
+
+    intersect_mins = K.maximum(b1_mins, b2_mins)
+    intersect_maxes = K.minimum(b1_maxes, b2_maxes)
+    intersect_wh = K.maximum(intersect_maxes - intersect_mins, 0.)
+    intersect_area = intersect_wh[..., 0] * intersect_wh[..., 1]
+    b1_area = b1_wh[..., 0] * b1_wh[..., 1]
+    b2_area = b2_wh[..., 0] * b2_wh[..., 1]
+    union_area = b1_area + b2_area - intersect_area
+    # calculate IoU, add epsilon in denominator to avoid dividing by 0
+    iou = intersect_area / (union_area + K.epsilon())
+
+    # box center distance
+    center_distance = K.sum(K.square(b1_xy - b2_xy), axis=-1)
+    # get enclosed area
+    enclose_mins = K.minimum(b1_mins, b2_mins)
+    enclose_maxes = K.maximum(b1_maxes, b2_maxes)
+    enclose_wh = K.maximum(enclose_maxes - enclose_mins, 0.0)
+    # get enclosed diagonal distance
+    enclose_diagonal = K.sum(K.square(enclose_wh), axis=-1)
+    # calculate DIoU, add epsilon in denominator to avoid dividing by 0
+    diou = iou - 1.0 * (center_distance) / (enclose_diagonal + K.epsilon())
+
+    # calculate param v and alpha to extend to CIoU
+    # v = 4*K.square(tf.math.atan2(b1_wh[..., 0], b1_wh[..., 1]) - tf.math.atan2(b2_wh[..., 0], b2_wh[..., 1])) / (math.pi * math.pi)
+    # alpha = v / (1.0 - iou + v)
+    # diou = diou - alpha*v
+
+    diou = K.expand_dims(diou, -1)
+    return diou
+
+
+def smooth_labels(y_true, label_smoothing):
+    label_smoothing = tf.constant(label_smoothing, dtype=tf.float16)
+    return y_true * (1.0 - label_smoothing) + 0.5 * label_smoothing
+
+
 def yolo_head(feats, anchors, num_classes, input_shape, calc_loss=False):
     """Convert final layer features to bounding box parameters."""
     num_anchors = len(anchors)
@@ -374,8 +487,8 @@ def get_yolo4_model(input_shape, anchors_path, classes_num):
                            classes_num // 3, classes_num + 5)) for l in range(3)]
 
     model_loss = Lambda(yolo4_loss, output_shape=(1,), name='yolo_loss',
-                                                            arguments={'anchors': anchors, 'num_classes': classes_num,
-                                                                       'ignore_thresh': 0.5})(
+                        arguments={'anchors': anchors, 'num_classes': classes_num,
+                                   'ignore_thresh': 0.5})(
         [*yolo4_body.output, *y_true])
     model = Model([yolo4_body.input, *y_true], model_loss)
 
