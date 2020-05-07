@@ -7,12 +7,11 @@
 # @Software: PyCharm
 # ============================================
 import tensorflow as tf
-from tensorflow.keras.layers import Activation
-from tensorflow.keras.utils import get_custom_objects
-from tensorflow.math import tanh, softplus
+from tensorflow.python.keras.engine.base_layer import Layer
+import tensorflow.keras.backend as K
 
 
-class Mish(Activation):
+class Mish(Layer):
     '''
     Mish Activation Function.
     .. math::
@@ -23,16 +22,20 @@ class Mish(Activation):
         when using this layer as the first layer in a model.
         - Output: Same shape as the input.
     Examples:
-        >>> X = Activation('Mish', name="conv1_act")(X_input)
+        >>> X_input = Input(input_shape)
+        >>> X = Mish()(X_input)
     '''
 
-    def __init__(self, activation, **kwargs):
-        super(Mish, self).__init__(activation, **kwargs)
-        self.__name__ = 'Mish'
+    def __init__(self, **kwargs):
+        super(Mish, self).__init__(**kwargs)
+        self.supports_masking = True
 
+    def call(self, inputs):
+        return inputs * K.tanh(K.softplus(inputs))
 
-def mish(inputs):
-    return inputs * tanh(softplus(inputs))
+    def get_config(self):
+        config = super(Mish, self).get_config()
+        return config
 
-
-get_custom_objects().update({'Mish': Mish(mish)})
+    def compute_output_shape(self, input_shape):
+        return input_shape

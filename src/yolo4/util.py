@@ -6,8 +6,9 @@
 # @File    : util.py         
 # @Software: PyCharm
 # ============================================
+import math
+import matplotlib.colors
 import tensorflow_core.python.keras.layers
-
 from .yolo4_Model import *
 import tensorflow as tf
 from tensorflow.keras.models import Model
@@ -90,24 +91,24 @@ def box_giou(b1, b2):
     b2_mins = b2_xy - b2_wh_half
     b2_maxes = b2_xy + b2_wh_half
 
-    intersect_mins = K.maximum(b1_mins, b2_mins)
-    intersect_maxes = K.minimum(b1_maxes, b2_maxes)
-    intersect_wh = K.maximum(intersect_maxes - intersect_mins, 0.)
+    intersect_mins = tf.maximum(b1_mins, b2_mins)
+    intersect_maxes = tf.minimum(b1_maxes, b2_maxes)
+    intersect_wh = tf.maximum(intersect_maxes - intersect_mins, 0.)
     intersect_area = intersect_wh[..., 0] * intersect_wh[..., 1]
     b1_area = b1_wh[..., 0] * b1_wh[..., 1]
     b2_area = b2_wh[..., 0] * b2_wh[..., 1]
     union_area = b1_area + b2_area - intersect_area
     # calculate IoU, add epsilon in denominator to avoid dividing by 0
-    iou = intersect_area / (union_area + K.epsilon())
+    iou = intersect_area / (union_area + tf.keras.backend.epsilon())
 
     # get enclosed area
-    enclose_mins = K.minimum(b1_mins, b2_mins)
-    enclose_maxes = K.maximum(b1_maxes, b2_maxes)
-    enclose_wh = K.maximum(enclose_maxes - enclose_mins, 0.0)
+    enclose_mins = tf.minimum(b1_mins, b2_mins)
+    enclose_maxes = tf.maximum(b1_maxes, b2_maxes)
+    enclose_wh = tf.maximum(enclose_maxes - enclose_mins, 0.0)
     enclose_area = enclose_wh[..., 0] * enclose_wh[..., 1]
     # calculate GIoU, add epsilon in denominator to avoid dividing by 0
-    giou = iou - 1.0 * (enclose_area - union_area) / (enclose_area + K.epsilon())
-    giou = K.expand_dims(giou, -1)
+    giou = iou - 1.0 * (enclose_area - union_area) / (enclose_area + tf.keras.backend.epsilon())
+    giou = tf.expand_dims(giou, -1)
 
     return giou
 
@@ -140,34 +141,88 @@ def box_diou(b1, b2):
     b2_mins = b2_xy - b2_wh_half
     b2_maxes = b2_xy + b2_wh_half
 
-    intersect_mins = K.maximum(b1_mins, b2_mins)
-    intersect_maxes = K.minimum(b1_maxes, b2_maxes)
-    intersect_wh = K.maximum(intersect_maxes - intersect_mins, 0.)
+    intersect_mins = tf.maximum(b1_mins, b2_mins)
+    intersect_maxes = tf.minimum(b1_maxes, b2_maxes)
+    intersect_wh = tf.maximum(intersect_maxes - intersect_mins, 0.)
     intersect_area = intersect_wh[..., 0] * intersect_wh[..., 1]
     b1_area = b1_wh[..., 0] * b1_wh[..., 1]
     b2_area = b2_wh[..., 0] * b2_wh[..., 1]
     union_area = b1_area + b2_area - intersect_area
     # calculate IoU, add epsilon in denominator to avoid dividing by 0
-    iou = intersect_area / (union_area + K.epsilon())
+    iou = intersect_area / (union_area + tf.keras.backend.epsilon())
 
     # box center distance
-    center_distance = K.sum(K.square(b1_xy - b2_xy), axis=-1)
+    center_distance = tf.keras.backend.sum(tf.square(b1_xy - b2_xy), axis=-1)
     # get enclosed area
-    enclose_mins = K.minimum(b1_mins, b2_mins)
-    enclose_maxes = K.maximum(b1_maxes, b2_maxes)
-    enclose_wh = K.maximum(enclose_maxes - enclose_mins, 0.0)
+    enclose_mins = tf.minimum(b1_mins, b2_mins)
+    enclose_maxes = tf.maximum(b1_maxes, b2_maxes)
+    enclose_wh = tf.maximum(enclose_maxes - enclose_mins, 0.0)
     # get enclosed diagonal distance
-    enclose_diagonal = K.sum(K.square(enclose_wh), axis=-1)
+    enclose_diagonal = tf.keras.backend.sum(tf.square(enclose_wh), axis=-1)
     # calculate DIoU, add epsilon in denominator to avoid dividing by 0
-    diou = iou - 1.0 * (center_distance) / (enclose_diagonal + K.epsilon())
+    diou = iou - 1.0 * (center_distance) / (enclose_diagonal + tf.keras.backend.epsilon())
 
     # calculate param v and alpha to extend to CIoU
     # v = 4*K.square(tf.math.atan2(b1_wh[..., 0], b1_wh[..., 1]) - tf.math.atan2(b2_wh[..., 0], b2_wh[..., 1])) / (math.pi * math.pi)
     # alpha = v / (1.0 - iou + v)
     # diou = diou - alpha*v
 
-    diou = K.expand_dims(diou, -1)
+    diou = tf.expand_dims(diou, -1)
     return diou
+
+
+def box_ciou(b1, b2):
+    """
+    Parameters
+    ----------
+    b1: tensor, shape = (batch, feat_w, feat_h, anchor_num, 4), xywh
+    b2: tensor, shape = (batch, feat_w, feat_h, anchor_num, 4), xywh
+
+    Returns
+    -------
+    ciou: tensor, shape = (batch, feat_w, feat_h, anchor_num, 1)
+    """
+    b1_xy = b1[..., :2]
+    b1_wh = b1[..., 2:4]
+    b1_wh_half = b1_wh / 2.
+    b1_mins = b1_xy - b1_wh_half
+    b1_maxes = b1_xy + b1_wh_half
+
+    b2_xy = b2[..., :2]
+    b2_wh = b2[..., 2:4]
+    b2_wh_half = b2_wh / 2.
+    b2_mins = b2_xy - b2_wh_half
+    b2_maxes = b2_xy + b2_wh_half
+
+    intersect_mins = tf.maximum(b1_mins, b2_mins)
+    intersect_maxes = tf.minimum(b1_maxes, b2_maxes)
+    intersect_wh = tf.maximum(intersect_maxes - intersect_mins, 0.)
+    intersect_area = intersect_wh[..., 0] * intersect_wh[..., 1]
+    b1_area = b1_wh[..., 0] * b1_wh[..., 1]
+    b2_area = b2_wh[..., 0] * b2_wh[..., 1]
+    union_area = b1_area + b2_area - intersect_area
+    # calculate IoU, add epsilon in denominator to avoid dividing by 0
+    iou = intersect_area / (union_area + tf.keras.backend.epsilon())
+
+    # box center distance
+    center_distance = tf.keras.backend.sum(tf.square(b1_xy - b2_xy), axis=-1)
+    # get enclosed area
+    enclose_mins = tf.minimum(b1_mins, b2_mins)
+    enclose_maxes = tf.maximum(b1_maxes, b2_maxes)
+    enclose_wh = tf.maximum(enclose_maxes - enclose_mins, 0.0)
+    # get enclosed diagonal distance
+    enclose_diagonal = tf.keras.backend.sum(tf.square(enclose_wh), axis=-1)
+    # calculate DIoU, add epsilon in denominator to avoid dividing by 0
+    diou = iou - 1.0 * (center_distance) / (enclose_diagonal + tf.keras.backend.epsilon())
+
+    # calculate param v and alpha to extend to CIoU
+    v = 4 * tf.keras.backend.square(
+        tf.math.atan2(b1_wh[..., 0], b1_wh[..., 1]) - tf.math.atan2(b2_wh[..., 0], b2_wh[..., 1])) / (math.pi * math.pi)
+    alpha = v / (1.0 - iou + v)
+    ciou = diou - alpha * v
+
+    ciou = tf.expand_dims(ciou, -1)
+    return ciou
 
 
 def smooth_labels(y_true, label_smoothing):
@@ -177,6 +232,7 @@ def smooth_labels(y_true, label_smoothing):
 
 def yolo_head(feats, anchors, num_classes, input_shape, calc_loss=False):
     """Convert final layer features to bounding box parameters."""
+
     num_anchors = len(anchors)
     # Reshape to batch, height, width, num_anchors, box_params.
     anchors_tensor = tf.reshape(tf.constant(anchors), [1, 1, 1, num_anchors, 2])
@@ -354,7 +410,7 @@ def _get_random_data(annotation_line, input_shape, random=True, max_boxes=20, ji
     hue = rand(-hue, hue)
     sat = rand(1, sat) if rand() < .5 else 1 / rand(1, sat)
     val = rand(1, val) if rand() < .5 else 1 / rand(1, val)
-    x = rgb_to_hsv(np.array(image) / 255.)
+    x = matplotlib.colors.rgb_to_hsv(np.array(image) / 255.)
     x[..., 0] += hue
     x[..., 0][x[..., 0] > 1] -= 1
     x[..., 0][x[..., 0] < 0] += 1
@@ -362,7 +418,7 @@ def _get_random_data(annotation_line, input_shape, random=True, max_boxes=20, ji
     x[..., 2] *= val
     x[x > 1] = 1
     x[x < 0] = 0
-    image_data = hsv_to_rgb(x)  # numpy array, 0 to 1
+    image_data = matplotlib.hsv_to_rgb(x)  # numpy array, 0 to 1
 
     # correct boxes
     box_data = np.zeros((max_boxes, 5))

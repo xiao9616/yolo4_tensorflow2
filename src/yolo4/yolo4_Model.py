@@ -16,8 +16,8 @@ from tensorflow.keras.layers import UpSampling2D
 from tensorflow.keras.layers import Concatenate
 from tensorflow.keras.layers import Activation, MaxPool2D, UpSampling2D
 from tensorflow.keras.activations import linear
-from .Mish import *
-
+from tensorflow.keras.models import Model
+from src.yolo4.Mish import Mish
 
 def conv(x, filters, kernel_size, strides=(1, 1), padding='same', activation="Mish", use_bias=True):
     x = Conv2D(filters, kernel_size, strides, padding, use_bias=use_bias)(x)
@@ -25,7 +25,7 @@ def conv(x, filters, kernel_size, strides=(1, 1), padding='same', activation="Mi
     if activation == 'LeakRelu':
         x = LeakyReLU()(x)
     if activation == 'Mish':
-        x = Activation('Mish')(x)
+        x = Mish()(x)
     if activation == 'Linear':
         x = linear(x)
     return x
@@ -51,7 +51,7 @@ def res_sub(x, itea, num_filters):
 
 
 def spp_sub(x):
-    x1 = MaxPool2D(strides=(1, 1), pool_size=(3, 3), padding='same')(x)
+    x1 = MaxPool2D(strides=(1, 1), pool_size=(5, 5), padding='same')(x)
     x2 = MaxPool2D(strides=(1, 1), pool_size=(9, 9), padding='same')(x)
     x3 = MaxPool2D(strides=(1, 1), pool_size=(13, 13), padding='same')(x)
     x_out = Concatenate()([x1, x2, x3, x])
@@ -69,6 +69,7 @@ def upper_concate(x1, x2, num_filter1, num_filter2):
     x = conv(x, num_filter2, (3, 3), activation='LeakRelu')
     x = conv(x, num_filter1, (1, 1), activation='LeakRelu')
     return x
+
 
 def spp(x):
     x = conv(x, 512, (1, 1), activation='LeakRelu')
@@ -115,4 +116,5 @@ def yolo4(input, anchor_nums, classes_num):
     yolo2 = yolo(x2, 512, out_shape)
     x3 = merge(x2, x3, 512, 1024)
     yolo3 = yolo(x3, 1024, out_shape)
-    return yolo1, yolo2, yolo3
+    model = Model(input, [yolo1, yolo2, yolo3])
+    return model

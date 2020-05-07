@@ -205,7 +205,52 @@ Label=((1-epsilon) * inputs) + (epsilon / K)
 
 ### 9.CIOU loss
 
+以简洁明了的方式介绍iou，giou，diou，ciou
 
+**iou**
+
+![img](README.assets/20191203202554270.bmp)
+
+**giou**
+
+giou解决iou中，两框不相交的情况下（iou衡等于零），无法衡量损失
+
+对于相交的框，IOU可以被反向传播，即它可以直接用作优化的目标函数。但是非相交的，梯度将会为0，无法优化。此时使用GIoU可以完全避免此问题。所以可以作为目标函数
+
+![图5](README.assets/20191204123340966.bmp)
+
+**diou**
+
+giou也存在问题，如果存在如下图的情况时，giou会退化为iou
+
+![图7](README.assets/20191204164908739.png)
+
+考虑换一种方式来衡量两个框之间远近的度量方式
+
+![计算公式](README.assets/2019120416522227.png)
+
+`b，bgt`分别代表了anchor框和目标框的中心点，且`p`代表的是计算两个中心点间的欧式距离。`c`代表的是能够同时覆盖anchor和目标框的最小矩形的对角线距离。
+
+![图8 距离计算展示](README.assets/20191204170126808.png)
+
+GIoU loss类似，DIoU loss在与目标框不重叠时，仍然可以为边界框提供移动方向。
+
+DIoU loss可以直接最小化两个目标框的距离，而GIOU loss优化的是两个目标框之间的面积
+
+**ciou**
+
+一个好的目标框回归损失应该考虑三个重要的几何因素：重叠面积、中心点距离、长宽比。
+GIoU：为了归一化坐标尺度，利用IoU，并初步解决IoU为零的情况。
+DIoU：DIoU损失同时考虑了边界框的重叠面积和中心点距离。
+CIOU：Complete-IoU Loss，anchor框和目标框之间的长宽比的一致性也是极其重要的。
+
+CIOU Loss又引入一个box长宽比的惩罚项，该Loss考虑了box的长宽比，定义如下:
+
+![CIOU Loss计算](README.assets/20191204165753393.png)
+
+![惩罚项说明](README.assets/20191204165803764.png)
+
+其中α是用于平衡比例的参数。v用来衡量anchor框和目标框之间的比例一致性。从α参数的定义可以看出，损失函数会更加倾向于往重叠区域增多方向优化，尤其是IoU为零的时候。
 
 ## 网络结构
 
@@ -277,15 +322,16 @@ Label=((1-epsilon) * inputs) + (epsilon / K)
 代码完成度：
 
 - [ ] 数据增强Mosaic data augmentation
+- [x] kmeans
 - [ ] 正则化DropBlock regularization
 - [x] 类标签平滑Class label smoothing
 - [ ] Cutmix
 
-- [ ] Mish 激活 Mish-activation
-- [ ] Cross-stage partial connections (CSP)
+- [x] Mish 激活 Mish-activation
+- [x] Cross-stage partial connections (CSP)
 - [ ] Multi-input weighted residual connections (MiWRC)加权残差连接
 
-- [ ] 损失CIoU loss
+- [x] 损失CIoU loss
 - [ ] Cross mini-Batch Normalization (CmBN)
 - [ ] 自对抗训练Self-adversarial-training (SAT)
 - [ ] Eliminate grid sensitivity

@@ -8,6 +8,7 @@
 # ============================================
 
 from src.yolo4.util import *
+from src.yolo4.yolo4_Model import yolo4
 from configparser import ConfigParser
 from tensorflow.keras.callbacks import TensorBoard, ModelCheckpoint, ReduceLROnPlateau, EarlyStopping
 from tensorflow.keras.optimizers import Adam
@@ -63,4 +64,5 @@ def train(batch_size=32, optimizer=Adam(1e-3), epochs=1000):
 
 
 if __name__ == '__main__':
-    train()
+    model=yolo4(Input(shape=(608, 608, 3)),anchors_num,classes_num)
+    model.summary()
