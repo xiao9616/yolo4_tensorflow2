@@ -17,7 +17,7 @@ from tensorflow.keras.layers import Concatenate
 from tensorflow.keras.layers import Activation, MaxPool2D, UpSampling2D
 from tensorflow.keras.activations import linear
 from tensorflow.keras.models import Model
-from src.yolo4.Mish import Mish
+from .Mish import Mish
 
 def conv(x, filters, kernel_size, strides=(1, 1), padding='same', activation="Mish", use_bias=True):
     x = Conv2D(filters, kernel_size, strides, padding, use_bias=use_bias)(x)
