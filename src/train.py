@@ -6,7 +6,6 @@
 # @File    : train.py         
 # @Software: PyCharm
 # ============================================
-
 from src.yolo4.util import *
 from src.yolo4.yolo4_Model import *
 from configparser import ConfigParser
