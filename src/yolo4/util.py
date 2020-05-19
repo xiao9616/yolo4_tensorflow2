@@ -18,6 +18,27 @@ from PIL import Image
 import numpy as np
 
 
+class IOUSameXY():
+    def __init__(self, anchors, boxes):
+        super(IOUSameXY, self).__init__()
+        self.anchor_max = anchors / 2
+        self.anchor_min = - self.anchor_max
+        self.box_max = boxes / 2
+        self.box_min = - self.box_max
+        self.anchor_area = anchors[..., 0] * anchors[..., 1]
+        self.box_area = boxes[..., 0] * boxes[..., 1]
+
+    def calculate_iou(self):
+        intersect_min = np.maximum(self.box_min, self.anchor_min)
+        intersect_max = np.minimum(self.box_max, self.anchor_max)
+        intersect_wh = np.maximum(intersect_max - intersect_min + 1.0, 0.0)
+        intersect_area = intersect_wh[..., 0] * intersect_wh[..., 1]  # w * h
+        union_area = self.anchor_area + self.box_area - intersect_area
+        iou = intersect_area / union_area  # shape : [N, 9]
+
+        return iou
+
+
 class ReadTxt(object):
     def __init__(self, line_bytes):
         super(ReadTxt, self).__init__()
@@ -88,7 +109,7 @@ class GenerateLabel():
             # shape of wh : [N, 1, 2], N is the actual number of boxes per picture
             wh = np.expand_dims(wh, axis=1)
             # Calculate the iou between the box and the anchor, both center points are (0, 0).
-            iou_value = iou.IOUSameXY(anchors=anchors, boxes=wh).calculate_iou()
+            iou_value = IOUSameXY(anchors=anchors, boxes=wh).calculate_iou()
             # shape of best_anchor : [N]
             best_anchor = np.argmax(iou_value, axis=-1)
             for i, n in enumerate(best_anchor):
@@ -141,7 +162,7 @@ def process_single_image(image_filename):
 
 def resize_image_with_pad(image):
     image_tensor = tf.image.resize_with_pad(image=image, target_height=input_shape[0],
-                                                  target_width=input_shape[0])
+                                            target_width=input_shape[0])
     image_tensor = tf.cast(image_tensor, tf.float32)
     image_tensor = image_tensor / 255.0
     image_tensor = tf.expand_dims(image_tensor, axis=0)

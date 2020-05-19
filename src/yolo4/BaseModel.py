@@ -115,7 +115,7 @@ class BaseModel(object):
                 image_batch = process_image_batch(images)
                 label_batch = generate_label_batch(boxes)
                 with tf.GradientTape() as tape:
-                    out = net(image_batch, trainable=True)
+                    out = net(image_batch)
                     total_loss = loss(y_true=label_batch, y_pred=out)
                 gradients = tape.gradient(total_loss, net.trainable_variables)
                 optimizer.apply_gradients(grads_and_vars=zip(gradients, net.trainable_variables))
