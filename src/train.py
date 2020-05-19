@@ -7,7 +7,7 @@
 # @Software: PyCharm
 # ============================================
 from src.yolo4.util import *
-from src.yolo4.yolo4_Model import *
+from src.yolo4.Net import *
 from configparser import ConfigParser
 from tensorflow.keras.callbacks import TensorBoard, ModelCheckpoint, ReduceLROnPlateau, EarlyStopping
 from tensorflow.keras.optimizers import Adam
@@ -39,7 +39,7 @@ def train(batch_size, annotation_path, classes_path, anchors_path, weights_path,
 
     model = get_yolo4_model(input_shape, anchors, num_classes, weights_path=weights_path,
                             load_pretrained=False)  # make sure you know what you freeze
-
+    model.fit()
     logging = TensorBoard(log_dir=log_path)
     checkpoint = ModelCheckpoint(log_path + 'ep{epoch:03d}-loss{loss:.3f}-val_loss{val_loss:.3f}.h5',
                                  monitor='val_loss', save_weights_only=True, save_best_only=True, period=1)

@@ -9,6 +9,7 @@
 # 划分train/eval/test数据集（文件名）
 import os
 import random
+from config import *
 
 xmlPath = './Annotations/xml'
 savePath = './train_eval_test'

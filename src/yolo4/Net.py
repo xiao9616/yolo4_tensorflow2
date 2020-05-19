@@ -3,21 +3,18 @@
 # @Time    : 2020/4/25 下午3:44    
 # @Author  : xiao9616           
 # @Email   : 749935253@qq.com   
-# @File    : yolo4_Model.py         
+# @File    : Net.py
 # @Software: PyCharm
 # ============================================
-from tensorflow.keras.layers import BatchNormalization
-from tensorflow.keras.layers import Conv2D
-from tensorflow.keras.layers import LeakyReLU
-from tensorflow.keras.regularizers import l2
-from tensorflow.keras.layers import ZeroPadding2D
-from tensorflow.keras.layers import Add
-from tensorflow.keras.layers import UpSampling2D
-from tensorflow.keras.layers import Concatenate
-from tensorflow.keras.layers import Activation, MaxPool2D, UpSampling2D
+from tensorflow.keras.layers import Conv2D, BatchNormalization, LeakyReLU, Add, Concatenate, Activation, MaxPool2D, \
+    UpSampling2D, Layer, Input
 from tensorflow.keras.activations import linear
 from tensorflow.keras.models import Model
-from .Mish import Mish
+
+import tensorflow as tf
+from src.yolo4.Mish import Mish
+from src.yolo4.config import *
+
 
 def conv(x, filters, kernel_size, strides=(1, 1), padding='same', activation="Mish", use_bias=True):
     x = Conv2D(filters, kernel_size, strides, padding, use_bias=use_bias)(x)
@@ -100,8 +97,8 @@ def merge(x1, x2, num_filter1, num_filter2):
     return x
 
 
-def yolo4(input, anchor_nums, classes_num):
-    out_shape = anchor_nums * (5 + classes_num)
+def yolo4(input):
+    out_shape = anchors_num * (5 + classes_num)
     x = conv(input, 32, (3, 3))
     x = res(x, 64, 1, 64, 64, 64, 64)
     x = res(x, 128, 2, 64, 64, 64, 128)
@@ -116,5 +113,19 @@ def yolo4(input, anchor_nums, classes_num):
     yolo2 = yolo(x2, 512, out_shape)
     x3 = merge(x2, x3, 512, 1024)
     yolo3 = yolo(x3, 1024, out_shape)
-    model = Model(input, [yolo1, yolo2, yolo3])
+
+    return yolo1, yolo2, yolo3
+
+
+def YOLO4_NET():
+    model_input = Input(shape=input_shape)
+    model_output = yolo4(model_input)
+    model = Model(model_input, model_output)
     return model
+
+
+if __name__ == '__main__':
+    model_input = Input(shape=input_shape)
+    model_output = yolo4(model_input)
+    model = Model(model_input, model_output)
+    model.summary()

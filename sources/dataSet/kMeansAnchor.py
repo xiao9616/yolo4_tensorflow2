@@ -7,7 +7,7 @@
 # @Software: PyCharm
 # ============================================
 import numpy as np
-
+from config import *
 
 class YOLO_Kmeans:
 

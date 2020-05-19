@@ -8,8 +8,7 @@
 # ============================================
 import math
 import matplotlib.colors
-import tensorflow_core.python.keras.layers
-from .yolo4_Model import *
+from .Net import *
 import tensorflow as tf
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Input, Lambda
@@ -17,7 +16,136 @@ import tensorflow.keras.backend as K
 from functools import reduce
 from PIL import Image
 import numpy as np
-from matplotlib.colors import rgb_to_hsv, hsv_to_rgb
+
+
+class ReadTxt(object):
+    def __init__(self, line_bytes):
+        super(ReadTxt, self).__init__()
+        # bytes -> string
+        self.line_str = bytes.decode(line_bytes, encoding="utf-8")
+
+    def parse_line(self):
+        line_info = self.line_str.strip('\n')
+        split_line = line_info.split(" ")
+        box_num = (len(split_line) - 1) / 5
+        image_name = split_line[0]
+        # print("Reading {}".format(image_name))
+        split_line = split_line[1:]
+        boxes = []
+        for i in range(MAX_TRUE_BOX_NUM_PER_IMG):
+            if i < box_num:
+                box_xmin = int(float(split_line[i * 5]))
+                box_ymin = int(float(split_line[i * 5 + 1]))
+                box_xmax = int(float(split_line[i * 5 + 2]))
+                box_ymax = int(float(split_line[i * 5 + 3]))
+                class_id = int(split_line[i * 5 + 4])
+                boxes.append([box_xmin, box_ymin, box_xmax, box_ymax, class_id])
+            else:
+                box_xmin = 0
+                box_ymin = 0
+                box_xmax = 0
+                box_ymax = 0
+                class_id = 0
+                boxes.append([box_xmin, box_ymin, box_xmax, box_ymax, class_id])
+
+        return image_name, boxes
+
+
+class GenerateLabel():
+    def __init__(self, true_boxes, input_shape):
+        super(GenerateLabel, self).__init__()
+        self.true_boxes = np.array(true_boxes, dtype=np.float32)
+        self.input_shape = np.array(input_shape, dtype=np.int32)
+        self.anchors = np.array(anchor, dtype=np.float32)
+        self.batch_size = self.true_boxes.shape[0]
+
+    def generate_label(self):
+        center_xy = (self.true_boxes[..., 0:2] + self.true_boxes[..., 2:4]) // 2  # shape : [B, N, 2]
+        box_wh = self.true_boxes[..., 2:4] - self.true_boxes[..., 0:2]  # shape : [B, N, 2]
+        self.true_boxes[..., 0:2] = center_xy / self.input_shape  # Normalization
+        self.true_boxes[..., 2:4] = box_wh / self.input_shape  # Normalization
+        true_label_1 = np.zeros(
+            (self.batch_size, scale_size[0], scale_size[0], 3, classes_num + 5))
+        true_label_2 = np.zeros(
+            (self.batch_size, scale_size[1], scale_size[1], 3, classes_num + 5))
+        true_label_3 = np.zeros(
+            (self.batch_size, scale_size[2], scale_size[2], 3, classes_num + 5))
+        # true_label : list of 3 arrays of type numpy.ndarray(all elements are 0), which shapes are:
+        # (self.batch_size, 13, 13, 3, 5 + C)
+        # (self.batch_size, 26, 26, 3, 5 + C)
+        # (self.batch_size, 52, 52, 3, 5 + C)
+        true_label = [true_label_1, true_label_2, true_label_3]
+        # shape : (9, 2) --> (1, 9, 2)
+        anchors = np.expand_dims(self.anchors, axis=0)
+        # valid_mask filters out the valid boxes.
+        valid_mask = box_wh[..., 0] > 0
+
+        for b in range(self.batch_size):
+            wh = box_wh[b, valid_mask[b]]
+            if len(wh) == 0:
+                # For pictures without boxes, iou is not calculated.
+                continue
+            # shape of wh : [N, 1, 2], N is the actual number of boxes per picture
+            wh = np.expand_dims(wh, axis=1)
+            # Calculate the iou between the box and the anchor, both center points are (0, 0).
+            iou_value = iou.IOUSameXY(anchors=anchors, boxes=wh).calculate_iou()
+            # shape of best_anchor : [N]
+            best_anchor = np.argmax(iou_value, axis=-1)
+            for i, n in enumerate(best_anchor):
+                for s in range(3):
+                    if n in anchor_index[s]:
+                        x = np.floor(self.true_boxes[b, i, 0] * scale_size[s]).astype('int32')
+                        y = np.floor(self.true_boxes[b, i, 1] * scale_size[s]).astype('int32')
+                        anchor_id = anchor_index[s].index(n)
+                        class_id = self.true_boxes[b, i, 4].astype('int32')
+                        true_label[s][b, y, x, anchor_id, 0:4] = self.true_boxes[b, i, 0:4]
+                        true_label[s][b, y, x, anchor_id, 4] = 1
+                        true_label[s][b, y, x, anchor_id, 5 + class_id - 1] = 1
+
+        return true_label
+
+
+def parse_dataset_batch(dataset):
+    image_name_list = []
+    boxes_list = []
+    len_of_batch = dataset.shape[0]
+    for i in range(len_of_batch):
+        image_name, boxes = ReadTxt(line_bytes=dataset[i].numpy()).parse_line()
+        image_name_list.append(image_name)
+        boxes_list.append(boxes)
+    boxes_array = np.array(boxes_list)
+    return image_name_list, boxes_array
+
+
+def generate_label_batch(true_boxes):
+    true_label = GenerateLabel(true_boxes=true_boxes, input_shape=[input_shape[0], input_shape[1]]).generate_label()
+    return true_label
+
+
+def process_image_batch(filenames):
+    image_list = []
+    for filename in filenames:
+        image_tensor = process_single_image(filename)
+        image_list.append(image_tensor)
+    return tf.concat(values=image_list, axis=0)
+
+
+def process_single_image(image_filename):
+    img_raw = tf.io.read_file(image_filename)
+    image = tf.io.decode_jpeg(img_raw, channels=3)
+    image = resize_image_with_pad(image=image)
+    image = tf.dtypes.cast(image, dtype=tf.dtypes.float32)
+    image = image / 255.0
+    return image
+
+
+def resize_image_with_pad(image):
+    image_tensor = tf.image.resize_with_pad(image=image, target_height=input_shape[0],
+                                                  target_width=input_shape[0])
+    image_tensor = tf.cast(image_tensor, tf.float32)
+    image_tensor = image_tensor / 255.0
+    image_tensor = tf.expand_dims(image_tensor, axis=0)
+    return image_tensor
 
 
 def get_yolo4_model(input_shape, anchors, num_classes, weights_path, load_pretrained=True, freeze_body=2):
